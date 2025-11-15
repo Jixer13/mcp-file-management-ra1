@@ -4,12 +4,13 @@ import com.dam.accesodatos.model.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
+import javax.xml.parsers.*;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
@@ -824,11 +825,9 @@ public class FileUserServiceImpl implements FileUserService {
          * - Document, Element, NodeList
          * - NO usar JAXB automático
          */
-        
-        List<User> users = new ArrayList<>();
-        
+
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar readUsersFromXML usando DOM parser");
+        //throw new UnsupportedOperationException("TODO: Implementar readUsersFromXML usando DOM parser");
         
         // ESTRUCTURA XML esperada:
         // <users>
@@ -838,6 +837,74 @@ public class FileUserServiceImpl implements FileUserService {
         //     ... otros campos
         //   </user>
         // </users>
+
+        // VARIABLES //
+        List<User> users = new ArrayList<>();
+
+        try {
+            // 1. Crear DocumentBuilderFactory y DocumentBuilder
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+
+            // 2. Usar DocumentBuilder.parse() para obtener Document
+            Document document = builder.parse(new File(filePath));
+            document.getDocumentElement().normalize();
+
+            // 3. Obtener todos los elementos "user" con getElementsByTagName()
+            NodeList userNodeList = document.getElementsByTagName("user");
+
+            // 4. Para cada elemento user: extraer texto de cada campo
+            for (int i = 0; i < userNodeList.getLength(); i++) {
+                Node userNode = userNodeList.item(i);
+
+                if (userNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element userElement = (Element) userNode;
+
+                    // 5. Convertir texto a tipos apropiados
+                    Long id = Long.parseLong(getElementTextContent(userElement, "id"));
+                    String name = getElementTextContent(userElement, "name");
+                    String email = getElementTextContent(userElement, "email");
+                    String department = getElementTextContent(userElement, "department");
+                    String role = getElementTextContent(userElement, "role");
+                    Boolean active = Boolean.parseBoolean(getElementTextContent(userElement, "active"));
+
+                    // Parsear fechas (formato ISO: yyyy-MM-ddTHH:mm:ss)
+                    String createdAtStr = getElementTextContent(userElement, "createdAt");
+                    LocalDateTime createdAt = LocalDateTime.parse(createdAtStr);
+
+                    String updatedAtStr = getElementTextContent(userElement, "updatedAt");
+                    LocalDateTime updatedAt = LocalDateTime.parse(updatedAtStr);
+
+                    // 6. Crear objeto User con los datos extraídos
+                    User user = new User(id, name, email, department, role);
+                    user.setActive(active);
+                    user.setCreatedAt(createdAt);
+                    user.setUpdatedAt(updatedAt);
+
+                    users.add(user);
+                }
+            }
+
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException("Error al configurar el parser XML: " + e.getMessage(), e);
+        } catch (SAXException e) {
+            throw new RuntimeException("Error al parsear el XML: " + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new RuntimeException("Error al leer el archivo XML: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Error inesperado al leer usuarios desde XML: " + e.getMessage(), e);
+        }
+
+        return users;
+
+    }
+
+    private String getElementTextContent(Element userElement, String tagName) {
+        NodeList userNodeList = userElement.getElementsByTagName(tagName);
+        if (userNodeList.getLength() > 0) {
+            return userNodeList.item(0).getTextContent().trim();
+        }
+        return "";
     }
 
     @Override
