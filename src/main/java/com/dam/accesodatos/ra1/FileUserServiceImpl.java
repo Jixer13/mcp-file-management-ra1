@@ -1,6 +1,9 @@
 package com.dam.accesodatos.ra1;
 
 import com.dam.accesodatos.model.User;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
@@ -11,9 +14,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.parsers.*;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.*;
@@ -23,6 +24,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -928,7 +930,92 @@ public class FileUserServiceImpl implements FileUserService {
          */
         
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar writeUsersToXML usando DOM y Transformer");
+        //throw new UnsupportedOperationException("TODO: Implementar writeUsersToXML usando DOM y Transformer");
+
+        try {
+            // PASO 1:
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder db = factory.newDocumentBuilder();
+
+            // PASO 2:
+            Document document = db.newDocument();
+
+            // PASO 3:
+            Element rootElement = document.createElement("root");
+            document.appendChild(rootElement);
+
+            // PASO 4:
+            for (User user : users) {
+                Element userElement = document.createElement("user");
+
+                // SUBELEMENTOS
+                Element idElement = document.createElement("id");
+                idElement.appendChild(document.createTextNode(String.valueOf(user.getId())));
+                userElement.appendChild(idElement);
+
+                Element nameElement = document.createElement("name");
+                nameElement.appendChild(document.createTextNode(user.getName()));
+                userElement.appendChild(nameElement);
+
+                Element emailElement = document.createElement("email");
+                emailElement.appendChild(document.createTextNode(user.getEmail()));
+                userElement.appendChild(emailElement);
+
+                Element departmentElement = document.createElement("department");
+                departmentElement.appendChild(document.createTextNode(user.getDepartment()));
+                userElement.appendChild(departmentElement);
+
+                Element roleElement = document.createElement("role");
+                roleElement.appendChild(document.createTextNode(user.getRole()));
+                userElement.appendChild(roleElement);
+
+                Element activeElement = document.createElement("active");
+                activeElement.appendChild(document.createTextNode(user.getActive().toString()));
+                userElement.appendChild(activeElement);
+
+                Element createdAtElement = document.createElement("createdAt");
+                createdAtElement.appendChild(document.createTextNode(user.getCreatedAt().toString()));
+                userElement.appendChild(createdAtElement);
+
+                Element updatedAtElement = document.createElement("updatedAt");
+                updatedAtElement.appendChild(document.createTextNode(user.getUpdatedAt().toString()));
+                userElement.appendChild(updatedAtElement);
+
+                // AÑADIMOS EL ELEMENTO USER COMPLETO
+                rootElement.appendChild(userElement);
+
+                // PASO 5: Usar Transformer
+                TransformerFactory transformerFactory = TransformerFactory.newInstance();
+                Transformer transformer = transformerFactory.newTransformer();
+
+                // PASO 6: Configurar el Transformer para pretty-print
+                transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+                transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+                transformer.setOutputProperty(OutputKeys.STANDALONE, "yes");
+
+                // Creamos DOMSource, StreamResult
+                DOMSource source = new DOMSource(document);
+                StreamResult result = new StreamResult(new File(filePath));
+
+                // Escribimos el documento del archivo
+                transformer.transform(source, result);
+
+                return true;
+
+            }
+
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException("Error al configurar el parser XML: " + e.getMessage(), e);
+        } catch (TransformerConfigurationException e) {
+            throw new RuntimeException("Error al configurar el transformer: " + e.getMessage(), e);
+        } catch (TransformerException e) {
+            throw new RuntimeException("Error al transformar el documento XML: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Error inesperado al escribir usuarios a XML: " + e.getMessage(), e);
+        }
+
+        return true;
     }
 
     @Override
@@ -973,23 +1060,49 @@ public class FileUserServiceImpl implements FileUserService {
     public List<User> readUsersFromJSON(String filePath) {
         /*
          * TODO CE1.e: Implementar lectura de JSON usando Jackson
-         * 
+         *
          * Pasos requeridos:
          * 1. Validar que archivo existe
          * 2. Usar ObjectMapper.readValue() con TypeReference para List<User>
          * 3. Manejar excepciones de Jackson apropiadamente
          * 4. Retornar lista vacía si archivo está vacío
-         * 
+         *
          * Clases requeridas:
          * - ObjectMapper (ya creado como campo)
          * - TypeReference<List<User>>
          * - File (para pasar a readValue)
          */
-        
+
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar readUsersFromJSON usando Jackson ObjectMapper");
-        
+        //throw new UnsupportedOperationException("TODO: Implementar readUsersFromJSON usando Jackson ObjectMapper");
+
         // PISTA: objectMapper.readValue(new File(filePath), new TypeReference<List<User>>() {});
+
+        try {
+            // PASO 1: Validar que el archivo existe //
+            File pasarReadValue = new File(filePath);
+            if (!pasarReadValue.exists()) {
+                System.err.println("El archivo no existe: " + filePath);
+                return new ArrayList<>();
+            }
+
+            // PASO 2:
+            List<User> users = objectMapper.readValue(pasarReadValue, new TypeReference<List<User>>() {
+            });
+
+            return users != null ? users : new ArrayList<>();
+
+        } catch (JsonParseException e) {
+            System.err.println("Error al parsear el JSON: " + e.getMessage());
+            return new ArrayList<>();
+        } catch (JsonMappingException e) {
+            System.err.println("Error al mapear el JSON: " + e.getMessage());
+            return new ArrayList<>();
+        } catch (IOException e){
+            System.err.println("Error");
+            return new ArrayList<>();
+        }
+
     }
 
     @Override
