@@ -249,15 +249,43 @@ public class McpServerController {
         }
 
         try {
-            // Convertir Map a User objects (simplificado - en producción usar ObjectMapper)
+            // Convertir List<Map<String, Object>> a List<User>
             List<com.dam.accesodatos.model.User> users = new java.util.ArrayList<>();
-            // Nota: Esta conversión requiere implementación completa en producción
+
+            for (Map<String, Object> userData : usersData) {
+                // Extraer datos del map
+                Long id = userData.get("id") != null ? ((Number) userData.get("id")).longValue() : null;
+                String name = (String) userData.get("name");
+                String email = (String) userData.get("email");
+                String department = (String) userData.get("department");
+                String role = (String) userData.get("role");
+
+                // Crear User con constructor apropiado
+                User user = new User(id, name, email, department, role);
+
+                // Setters solo para campos mutables opcionales
+                if (userData.get("active") != null) {
+                    user.setActive((Boolean) userData.get("active"));
+                }
+
+                if (userData.get("createdAt") != null) {
+                    String createdAtStr = (String) userData.get("createdAt");
+                    user.setCreatedAt(LocalDateTime.parse(createdAtStr));
+                }
+
+                if (userData.get("updatedAt") != null) {
+                    String updatedAtStr = (String) userData.get("updatedAt");
+                    user.setUpdatedAt(LocalDateTime.parse(updatedAtStr));
+                }
+
+                users.add(user);
+            }
 
             boolean success = fileUserService.writeUsersToCSV(users, filePath);
 
             Map<String, Object> response = new HashMap<>();
             response.put("tool", "write_users_csv");
-            response.put("input", Map.of("filePath", filePath, "users", usersData.size()));
+            response.put("input", Map.of("filePath", filePath, "users", users.size()));
             response.put("result", success);
             response.put("status", "success");
 
@@ -339,13 +367,43 @@ public class McpServerController {
         }
 
         try {
+            // Convertir List<Map<String, Object>> a List<User>
             List<com.dam.accesodatos.model.User> users = new java.util.ArrayList<>();
+
+            for (Map<String, Object> userData : usersData) {
+                // Extraer datos del map
+                Long id = userData.get("id") != null ? ((Number) userData.get("id")).longValue() : null;
+                String name = (String) userData.get("name");
+                String email = (String) userData.get("email");
+                String department = (String) userData.get("department");
+                String role = (String) userData.get("role");
+
+                // Crear User con constructor apropiado
+                User user = new User(id, name, email, department, role);
+
+                // Setters solo para campos mutables opcionales
+                if (userData.get("active") != null) {
+                    user.setActive((Boolean) userData.get("active"));
+                }
+
+                if (userData.get("createdAt") != null) {
+                    String createdAtStr = (String) userData.get("createdAt");
+                    user.setCreatedAt(LocalDateTime.parse(createdAtStr));
+                }
+
+                if (userData.get("updatedAt") != null) {
+                    String updatedAtStr = (String) userData.get("updatedAt");
+                    user.setUpdatedAt(LocalDateTime.parse(updatedAtStr));
+                }
+
+                users.add(user);
+            }
 
             boolean success = fileUserService.writeUsersToJSON(users, filePath);
 
             Map<String, Object> response = new HashMap<>();
             response.put("tool", "write_users_json");
-            response.put("input", Map.of("filePath", filePath, "users", usersData.size()));
+            response.put("input", Map.of("filePath", filePath, "users", users.size()));
             response.put("result", success);
             response.put("status", "success");
 

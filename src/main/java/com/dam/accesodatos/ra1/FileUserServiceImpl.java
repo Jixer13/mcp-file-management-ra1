@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -21,8 +22,10 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -844,37 +847,43 @@ public class FileUserServiceImpl implements FileUserService {
         List<User> users = new ArrayList<>();
 
         try {
-            // 1. Crear DocumentBuilderFactory y DocumentBuilder
+            // 1. Crear DocumentBuilderFactory y DocumentBuilder para convertir el XML en un objeto
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
 
-            // 2. Usar DocumentBuilder.parse() para obtener Document
+            // 2. Usar DocumentBuilder.parse() para obtener Document, leemos el contenido del XML,
+            // parse se encarga entender la estructura del XML y de extraer los datos limpios.
+
             Document document = builder.parse(new File(filePath));
             document.getDocumentElement().normalize();
 
-            // 3. Obtener todos los elementos "user" con getElementsByTagName()
+            // 3. Obtener todos los elementos "user" con getElementsByTagName(), es decir, cogemos todo los elementos
+            // con la etiqueta "user"
             NodeList userNodeList = document.getElementsByTagName("user");
 
             // 4. Para cada elemento user: extraer texto de cada campo
             for (int i = 0; i < userNodeList.getLength(); i++) {
+                // Y pasamos el contenido a la lista que hemos creado antes
                 Node userNode = userNodeList.item(i);
 
                 if (userNode.getNodeType() == Node.ELEMENT_NODE) {
+                    // indicamos el contenido de cada campo usando Element, que extrae los datos de la lista anterior
                     Element userElement = (Element) userNode;
 
                     // 5. Convertir texto a tipos apropiados
-                    Long id = Long.parseLong(getElementTextContent(userElement, "id"));
-                    String name = getElementTextContent(userElement, "name");
-                    String email = getElementTextContent(userElement, "email");
-                    String department = getElementTextContent(userElement, "department");
-                    String role = getElementTextContent(userElement, "role");
-                    Boolean active = Boolean.parseBoolean(getElementTextContent(userElement, "active"));
+                    // pasamos el contenido del list (que son strings) a sus correspondientes tipos
+                    Long id = Long.parseLong(userElement.getElementsByTagName("id").item(0).getTextContent().trim());
+                    String name = userElement.getElementsByTagName("name").item(0).getTextContent().trim();
+                    String email = userElement.getElementsByTagName("email").item(0).getTextContent().trim();
+                    String department = userElement.getElementsByTagName("department").item(0).getTextContent().trim();
+                    String role = userElement.getElementsByTagName("role").item(0).getTextContent().trim();
+                    Boolean active = Boolean.parseBoolean(userElement.getElementsByTagName("active").item(0).getTextContent().trim());
 
                     // Parsear fechas (formato ISO: yyyy-MM-ddTHH:mm:ss)
-                    String createdAtStr = getElementTextContent(userElement, "createdAt");
+                    String createdAtStr = userElement.getElementsByTagName("createdAt").item(0).getTextContent().trim();
                     LocalDateTime createdAt = LocalDateTime.parse(createdAtStr);
 
-                    String updatedAtStr = getElementTextContent(userElement, "updatedAt");
+                    String updatedAtStr = userElement.getElementsByTagName("updatedAt").item(0).getTextContent().trim();
                     LocalDateTime updatedAt = LocalDateTime.parse(updatedAtStr);
 
                     // 6. Crear objeto User con los datos extraídos
@@ -898,15 +907,6 @@ public class FileUserServiceImpl implements FileUserService {
         }
 
         return users;
-
-    }
-
-    private String getElementTextContent(Element userElement, String tagName) {
-        NodeList userNodeList = userElement.getElementsByTagName(tagName);
-        if (userNodeList.getLength() > 0) {
-            return userNodeList.item(0).getTextContent().trim();
-        }
-        return "";
     }
 
     @Override
@@ -933,18 +933,19 @@ public class FileUserServiceImpl implements FileUserService {
         //throw new UnsupportedOperationException("TODO: Implementar writeUsersToXML usando DOM y Transformer");
 
         try {
-            // PASO 1:
+            // PASO 1: Creamos el DocumentBuilderFactory y el DocumentBuilder para convertir el XML en un objeto
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder db = factory.newDocumentBuilder();
 
-            // PASO 2:
+            // PASO 2: creamoso el documento vacio que vamos a ir rellenando con los subelementos
             Document document = db.newDocument();
 
-            // PASO 3:
+            // PASO 3: Creamos el elemento raiz, que se especifica como "root"
             Element rootElement = document.createElement("root");
             document.appendChild(rootElement);
 
-            // PASO 4:
+            // PASO 4: Creamos un for para recorrer el objero "User", y vamos a ir agregando los elementos dependiendo de
+            // lo que contenga la clase "User"
             for (User user : users) {
                 Element userElement = document.createElement("user");
 
@@ -984,19 +985,20 @@ public class FileUserServiceImpl implements FileUserService {
                 // AÑADIMOS EL ELEMENTO USER COMPLETO
                 rootElement.appendChild(userElement);
 
-                // PASO 5: Usar Transformer
+                // PASO 5: Usar Transformer, comvierte el arbol DOM de memoria a bytes para escribirlos al disco
                 TransformerFactory transformerFactory = TransformerFactory.newInstance();
                 Transformer transformer = transformerFactory.newTransformer();
 
-                // PASO 6: Configurar el Transformer para pretty-print
+                // PASO 6: Configurar el Transformer para pretty-print, es decir cambiamos el formato del transformer para
+                // evitar que el texto quede con signos raros y que no se pueda leer
                 transformer.setOutputProperty(OutputKeys.INDENT, "yes");
                 transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
                 transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
                 transformer.setOutputProperty(OutputKeys.STANDALONE, "yes");
 
                 // Creamos DOMSource, StreamResult
-                DOMSource source = new DOMSource(document);
-                StreamResult result = new StreamResult(new File(filePath));
+                DOMSource source = new DOMSource(document); // Especifica la entrada de la información que acabamos de crear
+                StreamResult result = new StreamResult(new File(filePath)); // Especifica la salida de la información que hemos creado
 
                 // Escribimos el documento del archivo
                 transformer.transform(source, result);
@@ -1086,10 +1088,13 @@ public class FileUserServiceImpl implements FileUserService {
                 return new ArrayList<>();
             }
 
-            // PASO 2:
+            // PASO 2: Usar ObjectMapper.readValue() con TypeReference para List<User>
+            // Esto le dice al objectMapper que lea el archivo, el typeReference dice al Jackson el tipo que es "List<User>"
+            // ya que no es capaz de indentificarlo
             List<User> users = objectMapper.readValue(pasarReadValue, new TypeReference<List<User>>() {
             });
 
+            // si el readValue da null saca por pantalla la lista vacía
             return users != null ? users : new ArrayList<>();
 
         } catch (JsonParseException e) {
@@ -1118,7 +1123,32 @@ public class FileUserServiceImpl implements FileUserService {
          */
         
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar writeUsersToJSON usando Jackson ObjectMapper");
+        //throw new UnsupportedOperationException("TODO: Implementar writeUsersToJSON usando Jackson ObjectMapper");
+
+        try {
+            // VARIABLES //
+            File ruta = new  File(filePath);
+            File parent = ruta.getParentFile();
+            // PASO 1: Si comprobáramos que la ruta no existe la creamos
+            if(parent != null && !parent.exists()) {
+                System.err.println("La ruta padre no existe: " + filePath);
+                parent.mkdirs();
+            }
+
+            // PASO 2: ObjetMapper + pretty_print,
+            // Creamos el mapper
+            ObjectMapper mapper = new ObjectMapper();
+            // Y lo hacemos que sea legible
+            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+            // PASO 3: Usar mapper.writeable para escribir en el archivo en la ruta que hemos especificado al principio
+            objectMapper.writeValue(ruta, users);
+            return true;
+
+        } catch (IOException e){
+            System.err.println("Error al escribir el JSON: " + e.getMessage());
+            return false;
+        }
     }
 
     // ========================================================================================
@@ -1150,7 +1180,7 @@ public class FileUserServiceImpl implements FileUserService {
         List<User> users = new ArrayList<>();
         
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar readUsersFromCSV usando BufferedReader");
+        //throw new UnsupportedOperationException("TODO: Implementar readUsersFromCSV usando BufferedReader");
         
         // EJEMPLO de estructura esperada:
         // try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
@@ -1162,6 +1192,73 @@ public class FileUserServiceImpl implements FileUserService {
         // } catch (IOException e) {
         //     throw new RuntimeException("Error leyendo CSV: " + e.getMessage(), e);
         // }
+
+        // PASO 1: Validar archivo
+        Path ruta = Paths.get(filePath);
+        if(!Files.exists(ruta)) {
+            throw new RuntimeException("El archivo no existe: " + filePath);
+        }
+
+        // PASO 2: Creamos el bufferReader para leer el archivo por lineas
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line = reader.readLine();
+            // cuando se pueda leer una linea que continue
+            while((line = reader.readLine()) != null) {
+                // Si hay lineas vacías esto las ignora ()
+                if(line.trim().isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    // Dividimos la linea en un array de cadenas y ponemos una "," para separar los datos y que así se vea mejor en la ejecución
+                    String[] campos = line.split(",");
+
+                    // Validamos que hay campos suficientes
+                    if (campos.length < 5) {
+                        throw new RuntimeException("Error con el formato incorrecto " + line);
+                    }
+
+                    // PASO 5: Convertimos cada línea en un objeto User, con la estructura que se encuentra en User.java
+                    Long id = Long.parseLong(campos[0].trim());
+                    String nombre = campos[1].trim();
+                    String email = campos[2].trim();
+                    String departmento = campos[3].trim();
+                    String rol = campos[4].trim();
+
+                    // Crear User con constructor básico
+                    User user = new User(id, nombre, email, departmento, rol);
+
+                    // Campos opcionales
+                    if (campos.length > 5 && !campos[5].trim().isEmpty()) {
+                        user.setActive(Boolean.parseBoolean(campos[5].trim()));
+                    }
+
+                    // PASO 6: Manejar el LocalDateTime desde String
+                    if (campos.length > 6 && !campos[6].trim().isEmpty()) {
+                        user.setCreatedAt(LocalDateTime.parse(campos[6].trim()));
+                    }
+
+                    if (campos.length > 7 && !campos[7].trim().isEmpty()) {
+                        user.setUpdatedAt(LocalDateTime.parse(campos[7].trim()));
+                    }
+
+                    // Y agregamos el contenido como un nuevo user
+                    users.add(user);
+
+
+                } catch (NumberFormatException e) {
+                    // PASO 8: Lanzar RuntimeException con mensaje decriptivo si hay errores
+                    throw new RuntimeException("Error parseando número en linea: "+ line, e);
+                } catch (DateTimeParseException e) {
+                    throw new RuntimeException("Error la parsear la fecha en la linea: "+ line, e);
+                }
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error al leer el CSV: "+ e.getMessage() ,e);
+        }
+
+        return users;
     }
 
     @Override
@@ -1185,7 +1282,67 @@ public class FileUserServiceImpl implements FileUserService {
          */
         
         // TODO: Implementar aquí
-        throw new UnsupportedOperationException("TODO: Implementar writeUsersToCSV usando PrintWriter");
+        //throw new UnsupportedOperationException("TODO: Implementar writeUsersToCSV usando PrintWriter");
+
+        try {
+            // PASO 1: Comprobar que el directorio padre esté creado y si no lo creamos
+            Path padre = Paths.get(filePath);
+            if (padre.getParent() != null) {
+                Files.createDirectories(padre.getParent());
+            }
+            // Creamos el DateTimeFormater, para dar formato a la fecha
+            DateTimeFormatter dtf = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+            // PASO 2: Usar try-with-resources con PrintWriter y FileWriter
+            // El FileWriter se encarga de enviar los datos a la path que hemos especificado
+            try(FileWriter fw = new FileWriter(filePath);
+                // El PrintWriter se encarga de esciribir el contenido que hemos enviado con el FileWriter
+                PrintWriter pw = new PrintWriter(fw)) {
+
+                // PASO 3: Escribir la línea de las cabeceras del CSV, que se encuentran en el User.java
+                pw.println("id,name,email,department,role,active,createdAt,updatedAt");
+
+                // PASO 4: Para cada usuario hay que formatear los campos separados por comas
+                for (User user : users) {
+                    // Creamos el builder para ir guardando los datos
+                    StringBuilder builder = new StringBuilder();
+
+                    // Guardamos todas las caveceras en el builder y separdas por comes
+                    builder.append(user.getId() != null ? user.getId() : "");
+                    builder.append(',');
+                    builder.append(user.getName() != null ? user.getName() : "");
+                    builder.append(',');
+                    builder.append(user.getEmail() != null ? user.getEmail() : "");
+                    builder.append(',');
+                    builder.append(user.getDepartment() != null ? user.getDepartment() : "");
+                    builder.append(',');
+                    builder.append(user.getRole() != null ? user.getRole() : "");
+                    builder.append(',');
+                    builder.append(user.getActive() != null ? user.getActive() : "");
+                    builder.append(',');
+
+                    // PASO 5: Manejar el formato de LocalDateTime a String
+                    builder.append(user.getCreatedAt() != null ? user.getCreatedAt() : "");
+                    builder.append(',');
+                    builder.append(user.getUpdatedAt() != null ? user.getUpdatedAt() : "");
+
+                    // Lo sacamos por pantalla
+                    pw.println(builder.toString());
+                }
+
+                // Todos los datos alamcenados temporalmente los escriba en el archivo
+                pw.flush();
+                fw.flush();
+
+            }
+            // PASO 7: Retornar que ha sido exitoso
+            return true;
+
+            } catch (IOException e) {
+            // PASO 8: Si da error lanzar el RuntimeException
+                throw new RuntimeException("Error al escribir el CSV: "+ e.getMessage() ,e);
+            }
+
     }
 
 
